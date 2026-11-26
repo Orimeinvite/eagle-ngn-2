@@ -68,7 +68,7 @@ wallet:'<svg viewBox="0 0 24 24"><path d="M19 7V5.5A1.5 1.5 0 0017.5 4H5a2 2 0 0
 more:'<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>',
 support:'<svg viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0116 0v1"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19c0 1.7-1.8 2.5-4 2.5h-1.5"/></svg>',
 cal:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/><path d="M9 15l2 2 4-4"/></svg>'};
-let S={},tab="home",AD={},at="wd",busy=false;
+let BI="";let S={},tab="home",AD={},at="wd",busy=false;
 async function api(action,d={}){
   try{const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({initData:T.initData,action,...d})});return await r.json()}
   catch(e){return{error:"No connection. Check your internet and try again."}}
@@ -129,12 +129,12 @@ function pick(cb){const i=document.createElement("input");i.type="file";i.accept
 function proof(id){pick(img=>act(async()=>{const r=await api("submit",{id,img});if(r.error)return toast(r.error);toast("Sent. Wait for admin approval.");await load()}))}
 
 function invite(){const u=S.user,link=`https://t.me/${BOT}?startapp=${S.uid}`,q=S.refs.filter(x=>x.ref_paid).length;return `
-<h1>Invite friends</h1><p style="margin:6px 0 16px">Earn ₦100.00 when a friend joins with your link and completes 3 tasks.</p>
+<h1>Invite friends</h1><p style="margin:6px 0 16px">Earn ₦100.00 when a friend joins with your link and completes 5 tasks.</p>
 <div class="card"><div class="row sp"><b>Your link</b><div style="text-align:right"><b style="font-size:28px">${S.refs.length}</b><p>invited</p></div></div>
 <div style="background:#071530;border-radius:14px;padding:14px;margin:12px 0;word-break:break-all"><p>Your code</p><b style="font-size:22px;letter-spacing:2px">${S.uid}</b><p style="margin-top:6px">${link}</p></div>
 <div class="row"><button class="btn line" onclick="navigator.clipboard.writeText('${link}').then(()=>toast('Link copied'))">Copy link</button><button class="btn" onclick="T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent('${link}')+'&text='+encodeURIComponent('Join EAGLE NGN 🦅 and earn naira!'))">Share</button></div></div>
 <div class="grid3"><div class="card" style="text-align:center"><b style="font-size:24px">${S.refs.length}</b><p>Invited</p></div><div class="card" style="text-align:center"><b style="font-size:24px">${q}</b><p>Qualified</p></div><div class="card" style="text-align:center"><b class="gold" style="font-size:20px">${N(q*100)}</b><p>Earned</p></div></div>
-<div class="card"><h2>Your friends</h2>${S.refs.length?S.refs.map(x=>`<div class="row sp" style="padding:8px 0;border-top:1px solid var(--line)"><span>${esc(x.name)}</span><span class="${x.ref_paid?"ok":"mut"}">${x.ref_paid?"Qualified":x.tasks_done+"/3 tasks"}</span></div>`).join(""):`<p>No one yet. Share your link to start earning!</p>`}</div>${ci()}`}
+<div class="card"><h2>Your friends</h2>${S.refs.length?S.refs.map(x=>`<div class="row sp" style="padding:8px 0;border-top:1px solid var(--line)"><span>${esc(x.name)}</span><span class="${x.ref_paid?"ok":"mut"}">${x.ref_paid?"Qualified":Math.min(x.tasks_done,5)+"/5 tasks"}</span></div>`).join(""):`<p>No one yet. Share your link to start earning!</p>`}</div>${ci()}`}
 
 function wallet(){const u=S.user,b=u.bank;return `
 <h1 style="margin-bottom:14px">Wallet</h1>
@@ -144,17 +144,17 @@ function wallet(){const u=S.user,b=u.bank;return `
 <input id="ac" inputmode="numeric" maxlength="10" placeholder="10-digit account number" value="${b?esc(b.acc):""}">
 <input id="an" placeholder="Account name (as on your bank)" value="${b?esc(b.name):""}">
 <button class="btn" onclick="saveBank()">Save bank account</button></div>
-<div class="card"><h2>Withdraw</h2><input id="am" inputmode="numeric" placeholder="₦ Min 1,000.00" oninput="calc()">
+<div class="card"><h2>Withdraw</h2><p style="margin-bottom:10px">One withdrawal per day. It resets at midnight (Nigeria time).</p><input id="am" inputmode="numeric" placeholder="₦ Min 1,000.00" oninput="calc()">
 <div class="row sp mut"><span id="fee">Fee 10%</span><span id="rec">You receive —</span></div>
 <p class="ok" style="margin:10px 0;font-weight:600" onclick="$('#am').value=Math.floor(S.user.balance);calc()">Use full balance (${N(u.balance)})</p>
-<button class="btn" id="wb" onclick="withdraw()">${b?"Withdraw":"Add a bank account first"}</button></div>
+<button class="btn" id="wb" ${S.wdToday?"disabled":""} onclick="withdraw()">${S.wdToday?"Already withdrew today. Come back tomorrow":b?"Withdraw":"Add a bank account first"}</button></div>
 <div class="card"><h2>History</h2>${S.wd.length?S.wd.map(x=>`<div class="row sp" style="padding:8px 0;border-top:1px solid var(--line)"><span>${N(x.amount)}<br><span class="mut" style="font-size:12px">You get ${N(x.net)}</span></span><span class="${x.status=="paid"?"ok":x.status=="rejected"?"":"gold"}" style="${x.status=="rejected"?"color:var(--red)":""}">${x.status=="paid"?"Successful":x.status=="rejected"?"Rejected":"Pending"}</span></div>`).join(""):`<p>No withdrawals yet.</p>`}</div>`}
 function calc(){const a=Number($("#am")?.value)||0;if(!$("#fee"))return;$("#fee").textContent="Fee "+(a?N(a*.1):"10%");$("#rec").textContent="You receive "+(a?N(a*.9):"—")}
 function saveBank(){act(async()=>{const r=await api("save_bank",{bank:$("#bk").value,acc:$("#ac").value.trim(),name:$("#an").value});if(r.error)return toast(r.error);toast("Bank account saved");await load()})}
-function withdraw(){act(async()=>{const a=Number($("#am").value);if(!S.user.bank)return toast("Add a bank account first.");if(a<1000)return toast("Minimum withdrawal is ₦1,000.");const r=await api("withdraw",{amount:a});if(r.error)return toast(r.error);toast("Withdrawal requested. 10% fee applied.");await load()})}
+function withdraw(){act(async()=>{if(S.wdToday)return toast("You already withdrew today. Come back tomorrow.");const a=Number($("#am").value);if(!S.user.bank)return toast("Add a bank account first.");if(a<1000)return toast("Minimum withdrawal is ₦1,000.");const r=await api("withdraw",{amount:a});if(r.error)return toast(r.error);toast("Withdrawal requested. 10% fee applied.");await load()})}
 
 function more(){return `<h1 style="margin-bottom:14px">More</h1>
-<div class="card"><h2>How it works</h2><p>1. Do Telegram, WhatsApp and sponsored post tasks.<br>2. Invite friends: ₦100 when they finish 3 tasks.<br>3. Withdraw from ₦1,000. A 10% fee is removed from each withdrawal.</p></div>
+<div class="card"><h2>How it works</h2><p>1. Do Telegram, WhatsApp and sponsored post tasks.<br>2. Invite friends: ₦100 when they finish 5 tasks.<br>3. Withdraw from ₦1,000. A 10% fee is removed from each withdrawal. You can withdraw once a day.</p></div>
 <div class="card ci" style="margin-bottom:14px"><div class="ib" style="background:#14325c">${IC.support}</div><div class="grow"><b>Contact Support</b><p>Need help? Chat with us on Telegram</p></div><button class="btn" onclick="openL('https://t.me/eaglengn2')">Chat</button></div>
 ${S.admin?`<button class="btn gold" onclick="go('admin')">🛠 Admin dashboard</button>`:""}`}
 
@@ -169,7 +169,8 @@ function adminDraw(){
   if(at=="sub")el.innerHTML=(AD.subs.length?AD.subs.map(s=>`<div class="card"><b>${esc(s.task?.title||"Task")}</b> <span class="tag">${N(s.task?.amount)}</span><p>${esc(s.name)} · ID ${s.user_id}</p><img class="pv" src="${s.img}" style="max-height:360px;object-fit:contain"><div class="row"><button class="btn red" onclick="decide('a_sub',${s.id},0)">Reject</button><button class="btn" onclick="decide('a_sub',${s.id},1)">Approve</button></div></div>`).join(""):`<div class="card"><p>No screenshots waiting.</p></div>`);
   if(at=="usr")el.innerHTML=`<div class="card"><p>Total users: <b>${AD.users}</b></p><input id="tid" inputmode="numeric" placeholder="Telegram ID" style="margin-top:10px"><button class="btn" onclick="find()">Search user</button><div id="ur"></div></div>`;
   if(at=="tk")el.innerHTML=`<div class="card"><h2>Add task</h2><select id="tt" onchange="tkf()"><option value="telegram">Telegram channel task</option><option value="sponsored">Sponsored post</option><option value="whatsapp">WhatsApp task</option></select><input id="tl" placeholder="Title"><input id="ta" inputmode="numeric" placeholder="Amount (₦)"><input id="tk" placeholder="Join link (https://t.me/... or WhatsApp link)"><input id="tc" placeholder="Channel username, e.g. @mychannel (bot must be admin there)"><input id="ti" placeholder="Picture link (https://...)" style="display:none"><textarea id="tb" placeholder="Write-up people must copy and post" style="display:none"></textarea><button class="btn" onclick="addTask()">Add task</button></div>`+AD.tasks.map(t=>`<div class="card row sp"><div><b>${esc(t.title)}</b><p>${t.type} · ${N(t.amount)}</p></div><button class="btn red sm" onclick="delTask(${t.id})">Delete</button></div>`).join("");
-  if(at=="bc")el.innerHTML=`<div class="card"><h2>Message everybody</h2><p style="margin-bottom:10px">Shows on every user's Home screen and is sent to them in the Eagle NGN bot.</p><textarea id="bm" placeholder="Write your message"></textarea><button class="btn" onclick="bcast()">Send to all</button></div>`;
+  if(at=="bc"){el.innerHTML=`<div class="card"><h2>Message everybody</h2><p style="margin-bottom:10px">Your text shows on every user's Home screen. The text and picture are also sent to everyone in the Eagle NGN bot.</p><textarea id="bm" placeholder="Write your message (optional if you add a picture)"></textarea><div id="bp"></div><button class="btn line" style="margin-bottom:10px" onclick="bcPick()">📷 ${BI?"Change":"Add"} picture from gallery</button><button class="btn" onclick="bcast()">Send to all</button></div>`;
+    if(BI)$("#bp").innerHTML=`<img class="pv" src="${BI}"><button class="btn red sm" style="margin-bottom:12px" onclick="bcRedraw(null)">Remove picture</button>`}
 }
 function decide(a,id,ok){act(async()=>{const r=await api(a,{id,ok});if(r.error)toast(r.error);await adminLoad()})}
 function find(){act(async()=>{const r=await api("a_find",{tid:$("#tid").value.trim()});userBox(r)})}
@@ -178,7 +179,9 @@ function addMoney(id){act(async()=>{const a=Number($("#aa").value);if(!a)return 
 function tkf(){const t=$("#tt").value;$("#tc").style.display=t=="telegram"?"block":"none";$("#ti").style.display=$("#tb").style.display=t=="sponsored"?"block":"none";$("#tk").style.display=t=="sponsored"?"none":"block"}
 function addTask(){act(async()=>{const r=await api("a_task_add",{type:$("#tt").value,title:$("#tl").value,amount:$("#ta").value,link:$("#tk").value,chat:$("#tc").value.trim(),image:$("#ti").value.trim(),body:$("#tb").value});if(r.error)return toast(r.error);toast("Task added");await adminLoad()})}
 function delTask(id){if(!confirm("Delete this task?"))return;act(async()=>{await api("a_task_del",{id});await adminLoad()})}
-function bcast(){const t=$("#bm").value.trim();if(!t)return toast("Write a message");if(!confirm("Send to everybody?"))return;act(async()=>{const r=await api("a_bcast",{text:t});if(r.error)return toast(r.error);toast("Sent to "+r.sent+" users");$("#bm").value=""})}
+function bcRedraw(img){const t=$("#bm")?$("#bm").value:"";if(img!==undefined&&img!==null)BI=img;else if(img===null)BI="";adminDraw();if($("#bm"))$("#bm").value=t}
+function bcPick(){pick(img=>bcRedraw(img))}
+function bcast(){const t=$("#bm").value.trim();if(!t&&!BI)return toast("Write a message or add a picture");if(!confirm("Send to everybody?"))return;act(async()=>{const r=await api("a_bcast",{text:t,img:BI});if(r.error)return toast(r.error);toast("Sent to "+r.sent+" users");BI="";adminDraw()})}
 function start(){if(window.Telegram&&Telegram.WebApp){T=Telegram.WebApp;T.ready();T.expand()}load()}
 (function(){const s=document.createElement("script");s.src="https://telegram.org/js/telegram-web-app.js";s.async=true;s.onload=start;s.onerror=start;document.head.appendChild(s)})();
 </script>
